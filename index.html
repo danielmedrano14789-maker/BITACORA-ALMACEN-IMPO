@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>BITACORA DE ALMACEN UBER</title>
+
+<style>
+body {margin:0;font-family:Arial;background:#0f172a;color:white;}
+.header {background:#020617;padding:15px;font-size:18px;font-weight:bold;}
+.container {padding:15px;}
+.card {background:#111827;padding:15px;margin-bottom:15px;border-radius:10px;}
+.grid {display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+input,select,textarea {padding:8px;border-radius:6px;border:none;}
+button {padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:12px;}
+.btn-primary {background:#2563eb;color:white;}
+.btn-success {background:#16a34a;color:white;}
+.btn-danger {background:#dc2626;color:white;}
+.btn-warning {background:#f59e0b;color:black;}
+table {width:100%;border-collapse:collapse;font-size:12px;}
+th {background:#1e293b;}
+td,th {border:1px solid #334155;padding:6px;text-align:center;}
+.hidden {display:none;}
+
+@keyframes alertaFuerte {
+0%{background:#111827;}
+50%{background:#ff0000;color:white;}
+100%{background:#111827;}
+}
+
+/* SEMAFORO */
+.rojo {background:#dc2626;}
+.amarillo {background:#facc15;color:black;}
+.verde {background:#16a34a;}
+
+.alerta {animation:alertaFuerte 1s infinite;}
+</style>
+</head>
+
+<body>
+
+<div class="header">🚚 BITACORA DE ALMACEN UBER</div>
+
+<div class="container">
+
+<button onclick="verTab('principal')" class="btn-primary">Bitácora</button>
+<button onclick="verTab('readyTab')" class="btn-success">READY TO IMPORT</button>
+<button onclick="verTab('eliminadosTab')" class="btn-danger">Eliminados</button>
+
+<!-- BITACORA -->
+<div id="principal">
+
+<div class="card grid">
+<input id="ejecutivo" placeholder="Ejecutivo">
+<input id="referencia" placeholder="Referencia">
+<input id="guia" placeholder="Guía">
+<input id="transportista" placeholder="Transportista">
+
+<select id="planta">
+<option value="">Planta</option>
+<option>XICO</option><option>SITSA</option><option>P3</option><option>P4</option>
+<option>P1</option><option>SRD</option><option>DRG</option><option>QRO</option>
+<option>QRT2</option><option>CPA</option><option>MTY</option><option>XTS</option>
+<option>CHO</option><option>CMX</option><option>SCL</option>
+</select>
+
+<select id="tipo">
+<option value="">Incidencia</option>
+<option>Por llegar</option>
+<option>Entregado</option>
+<option>Cambio de planta</option>
+<option>Separación</option>
+<option>Sin entrada</option>
+<option>Sin revisión ni previo</option>
+</select>
+</div>
+
+<textarea id="comentario" placeholder="Comentarios"></textarea><br>
+
+<button class="btn-primary" onclick="guardar()">Guardar</button>
+<button class="btn-success" onclick="exportar()">Exportar</button>
+<button class="btn-warning" onclick="imprimirPendientes()">Imprimir PENDIENTES</button>
+
+<div class="card grid">
+<input type="date" id="filtroFecha" onchange="filtrar()">
+<input type="text" id="filtroEjecutivo" placeholder="Ejecutivo" onkeyup="filtrar()">
+</div>
+
+<table>
+<thead>
+<tr>
+<th>Fecha</th><th>Ejecutivo</th><th>Referencia</th><th>Guía</th>
+<th>Transportista</th><th>Planta</th><th>Incidencia</th>
+<th>Comentarios</th><th>Tiempo</th><th>Acciones</th>
+</tr>
+</thead>
+<tbody id="tabla"></tbody>
+</table>
+
+</div>
+
+<!-- READY -->
+<div id="readyTab" class="hidden">
+
+<div class="card grid">
+<input type="date" id="filtroFechaReady" onchange="filtrarReady()">
+<input type="text" id="filtroEjecutivoReady" placeholder="Ejecutivo" onkeyup="filtrarReady()">
+<select id="filtroPlantaReady" onchange="filtrarReady()">
+<option value="">Planta</option>
+<option>XICO</option><option>SITSA</option><option>P3</option><option>P4</option>
+<option>P1</option><option>SRD</option><option>DRG</option><option>QRO</option>
+<option>QRT2</option><option>CPA</option><option>MTY</option><option>XTS</option>
+<option>CHO</option><option>CMX</option><option>SCL</option>
+</select>
+</div>
+
+<table>
+<thead>
+<tr>
+<th>Fecha</th><th>Ejecutivo</th><th>Referencia</th><th>Guía</th>
+<th>Transportista</th><th>Planta</th><th>Incidencia</th>
+</tr>
+</thead>
+<tbody id="tablaReady"></tbody>
+</table>
+
+</div>
+
+<!-- ELIMINADOS -->
+<div id="eliminadosTab" class="hidden">
+<table>
+<thead>
+<tr><th>Fecha</th><th>Referencia</th><th>Eliminado por</th></tr>
+</thead>
+<tbody id="tablaEliminados"></tbody>
+</table>
+</div>
+
+</div>
+
+<script>
+let datos=JSON.parse(localStorage.getItem("bitacora"))||[];
+let readyData=JSON.parse(localStorage.getItem("ready"))||[];
+let eliminados=JSON.parse(localStorage.getItem("eliminados"))||[];
+let editIndex=null;
+const PASSWORD="admin123";
+
+function guardar(){
+let f=new Date();
+let nuevaRef=referencia.value.trim();
+let nuevaGuia=guia.value.trim();
+
+let duplicado=datos.some((d,index)=>{
+if(index===editIndex)return false;
+return((nuevaRef && d.referencia===nuevaRef)||(nuevaGuia && d.guia===nuevaGuia));
+});
+
+if(duplicado){alert("❌ Ya existe una guía o referencia");return;}
+
+let reg={
+fecha:f.toLocaleString(),
+fechaISO:f.toISOString().split("T")[0],
+ejecutivo:ejecutivo.value,
+referencia:nuevaRef,
+guia:nuevaGuia,
+transportista:transportista.value,
+planta:planta.value,
+tipo:tipo.value,
+comentario:comentario.value,
+alertado:false
+};
+
+if(!reg.ejecutivo||!reg.planta||!reg.tipo){alert("Faltan datos");return;}
+
+if(editIndex!==null){datos[editIndex]=reg;editIndex=null;}
+else{datos.push(reg);}
+
+localStorage.setItem("bitacora",JSON.stringify(datos));
+mostrar();
+}
+
+function mostrar(lista=datos){
+tabla.innerHTML="";
+let ahora=new Date();
+
+lista.forEach((d,i)=>{
+
+let fechaRegistro=new Date(d.fechaISO);
+let horas=Math.floor((ahora-fechaRegistro)/(1000*60*60));
+let dias=Math.floor(horas/24);
+let tiempoTexto=dias>0?dias+" días":horas+" hrs";
+
+let clase="verde";
+if(!d.referencia){clase="rojo alerta";}
+else if(dias>=1){clase="rojo";}
+else if(horas>=4){clase="amarillo";}
+
+// ALERTA
+if(!d.alertado && horas>=4){
+alert("⚠️ Pendiente: "+(d.guia||"SIN GUIA"));
+d.alertado=true;
+localStorage.setItem("bitacora",JSON.stringify(datos));
+}
+
+tabla.innerHTML+=`
+<tr class="${clase}">
+<td>${d.fecha}</td>
+<td>${d.ejecutivo}</td>
+<td>${d.referencia||"SIN REFERENCIA"}</td>
+<td>${d.guia}</td>
+<td>${d.transportista}</td>
+<td>${d.planta}</td>
+<td>${d.tipo}</td>
+<td>${d.comentario||""}</td>
+<td>${tiempoTexto}</td>
+<td>
+<button onclick="editar(${i})">Editar</button>
+<button onclick="liberar(${i})">Liberar</button>
+<button onclick="eliminar(${i})">Eliminar</button>
+</td>
+</tr>`;
+});
+}
+
+function liberar(i){
+let r=datos[i];
+if(!r.referencia){alert("No tiene referencia");return;}
+readyData.push(r);
+datos.splice(i,1);
+localStorage.setItem("bitacora",JSON.stringify(datos));
+localStorage.setItem("ready",JSON.stringify(readyData));
+mostrar();
+mostrarReady();
+}
+
+function mostrarReady(lista=readyData){
+tablaReady.innerHTML="";
+lista.forEach(d=>{
+tablaReady.innerHTML+=`
+<tr>
+<td>${d.fecha}</td>
+<td>${d.ejecutivo}</td>
+<td>${d.referencia}</td>
+<td>${d.guia}</td>
+<td>${d.transportista}</td>
+<td>${d.planta}</td>
+<td>${d.tipo}</td>
+</tr>`;
+});
+}
+
+function filtrar(){
+let f=filtroFecha.value;
+let e=filtroEjecutivo.value.toLowerCase();
+let filtrados=datos.filter(d=>(f?d.fechaISO===f:true)&&(e?d.ejecutivo.toLowerCase().includes(e):true));
+mostrar(filtrados);
+}
+
+function filtrarReady(){
+let f=filtroFechaReady.value;
+let e=filtroEjecutivoReady.value.toLowerCase();
+let p=filtroPlantaReady.value;
+let filtrados=readyData.filter(d=>(f?d.fechaISO===f:true)&&(e?d.ejecutivo.toLowerCase().includes(e):true)&&(p?d.planta===p:true));
+mostrarReady(filtrados);
+}
+
+function editar(i){
+let d=datos[i];
+ejecutivo.value=d.ejecutivo;
+referencia.value=d.referencia;
+guia.value=d.guia;
+transportista.value=d.transportista;
+planta.value=d.planta;
+tipo.value=d.tipo;
+comentario.value=d.comentario;
+editIndex=i;
+}
+
+function eliminar(i){
+let pass=prompt("Contraseña:");
+if(pass!==PASSWORD)return alert("Incorrecta");
+let user=prompt("¿Quién elimina?");
+eliminados.push({fecha:new Date().toLocaleString(),referencia:datos[i].referencia,eliminadoPor:user});
+datos.splice(i,1);
+localStorage.setItem("bitacora",JSON.stringify(datos));
+localStorage.setItem("eliminados",JSON.stringify(eliminados));
+mostrar();
+mostrarEliminados();
+}
+
+function mostrarEliminados(){
+tablaEliminados.innerHTML="";
+eliminados.forEach(d=>{
+tablaEliminados.innerHTML+=`<tr><td>${d.fecha}</td><td>${d.referencia}</td><td>${d.eliminadoPor}</td></tr>`;
+});
+}
+
+function exportar(){
+let csv="Fecha,Ejecutivo,Referencia\n";
+datos.forEach(d=>{csv+=`${d.fecha},${d.ejecutivo},${d.referencia}\n`;});
+let blob=new Blob([csv]);
+let link=document.createElement("a");
+link.href=URL.createObjectURL(blob);
+link.download="bitacora.csv";
+link.click();
+}
+
+function imprimirPendientes(){
+let w=window.open("","");
+let html="<h2>PENDIENTES</h2><table border='1'><tr><th>Fecha</th><th>Ejecutivo</th><th>Guía</th><th>Planta</th></tr>";
+datos.forEach(d=>{
+html+=`<tr><td>${d.fecha}</td><td>${d.ejecutivo}</td><td>${d.guia}</td><td>${d.planta}</td></tr>`;
+});
+html+="</table><script>window.print()<\/script>";
+w.document.write(html);
+w.document.close();
+}
+
+function verTab(t){
+principal.classList.add("hidden");
+readyTab.classList.add("hidden");
+eliminadosTab.classList.add("hidden");
+document.getElementById(t).classList.remove("hidden");
+}
+
+mostrar();
+mostrarReady();
+mostrarEliminados();
+</script>
+
+</body>
+</html>

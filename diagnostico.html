@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Connection Diagnostics</title>
+    <script src="https://www.gstatic.com/firebasejs/9.1.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.2/firebase-database.js"></script>
+</head>
+<body>
+    <h1>Firebase Connection Status</h1>
+    <div id="status">Checking...</div>
+    <script>
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Check Firebase connection status
+        function checkFirebaseConnection() {
+            database.ref('.info/connected').on('value', (snapshot) => {
+                const isConnected = snapshot.val();
+                const statusDiv = document.getElementById('status');
+                if (isConnected) {
+                    statusDiv.textContent = 'Connected to Firebase';
+                    console.log('Connected to Firebase');
+                } else {
+                    statusDiv.textContent = 'Disconnected from Firebase';
+                    console.log('Disconnected from Firebase');
+                }
+            });
+        }
+
+        // Start checking Firebase connection status
+        checkFirebaseConnection();
+    </script>
+</body>
+</html>

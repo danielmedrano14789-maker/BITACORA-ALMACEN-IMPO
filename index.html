@@ -1,331 +1,555 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>BITACORA DE ALMACEN UBER</title>
-
-<style>
-body {margin:0;font-family:Arial;background:#0f172a;color:white;}
-.header {background:#020617;padding:15px;font-size:18px;font-weight:bold;}
-.container {padding:15px;}
-.card {background:#111827;padding:15px;margin-bottom:15px;border-radius:10px;}
-.grid {display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
-input,select,textarea {padding:8px;border-radius:6px;border:none;}
-button {padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:12px;}
-.btn-primary {background:#2563eb;color:white;}
-.btn-success {background:#16a34a;color:white;}
-.btn-danger {background:#dc2626;color:white;}
-.btn-warning {background:#f59e0b;color:black;}
-table {width:100%;border-collapse:collapse;font-size:12px;}
-th {background:#1e293b;}
-td,th {border:1px solid #334155;padding:6px;text-align:center;}
-.hidden {display:none;}
-
-@keyframes alertaFuerte {
-0%{background:#111827;}
-50%{background:#ff0000;color:white;}
-100%{background:#111827;}
-}
-
-/* SEMAFORO */
-.rojo {background:#dc2626;}
-.amarillo {background:#facc15;color:black;}
-.verde {background:#16a34a;}
-
-.alerta {animation:alertaFuerte 1s infinite;}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitácora de Almacén Uber - Tiempo Real</title>
+    <script src="https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: white;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #020617 0%, #1e293b 100%);
+            padding: 20px 15px;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .status {
+            font-size: 13px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            background: #16a34a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .status.offline {
+            background: #dc2626;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: white;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        button:hover { transform: translateY(-2px); }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-success { background: #16a34a; color: white; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-warning { background: #f59e0b; color: black; }
+        .btn-small { padding: 6px 10px; font-size: 12px; }
+        .card {
+            background: #111827;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        input, select, textarea {
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            background: #1e293b;
+            color: white;
+            font-family: inherit;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+        textarea { grid-column: 1 / -1; min-height: 100px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        th {
+            background: #1e293b;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #334155;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #334155;
+        }
+        tr:hover { background: rgba(37, 99, 235, 0.05); }
+        .status-verde { background: #16a34a; }
+        .status-amarillo { background: #facc15; color: black; }
+        .status-rojo { background: #dc2626; }
+        .hidden { display: none; }
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #64748b;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+    </style>
 </head>
-
 <body>
+    <div class="header">
+        <div>🚚 BITÁCORA DE ALMACÉN UBER</div>
+        <div class="status" id="status">
+            <span class="status-dot"></span>
+            Conectando...
+        </div>
+    </div>
 
-<div class="header">🚚 BITACORA DE ALMACEN UBER</div>
+    <div class="container">
+        <div class="tabs">
+            <button onclick="showTab('principal')" class="btn-primary">Bitácora</button>
+            <button onclick="showTab('ready')" class="btn-success">Ready to Import</button>
+            <button onclick="showTab('deleted')" class="btn-danger">Eliminados</button>
+        </div>
 
-<div class="container">
+        <!-- BITÁCORA PRINCIPAL -->
+        <div id="principal">
+            <div class="card">
+                <div class="grid">
+                    <input id="ejecutivo" placeholder="Ejecutivo" required>
+                    <input id="referencia" placeholder="Referencia">
+                    <input id="guia" placeholder="Guía" required>
+                    <input id="transportista" placeholder="Transportista">
+                    <select id="planta" required>
+                        <option value="">Selecciona Planta</option>
+                        <option>XICO</option><option>SITSA</option><option>P3</option><option>P4</option>
+                        <option>P1</option><option>SRD</option><option>DRG</option><option>QRO</option>
+                        <option>QRT2</option><option>CPA</option><option>MTY</option><option>XTS</option>
+                        <option>CHO</option><option>CMX</option><option>SCL</option>
+                    </select>
+                    <select id="tipo" required>
+                        <option value="">Selecciona Incidencia</option>
+                        <option>Por llegar</option>
+                        <option>Entregado</option>
+                        <option>Cambio de planta</option>
+                        <option>Separación</option>
+                        <option>Sin entrada</option>
+                        <option>Sin revisión ni previo</option>
+                    </select>
+                </div>
+                <textarea id="comentario" placeholder="Comentarios (opcional)"></textarea>
+            </div>
 
-<button onclick="verTab('principal')" class="btn-primary">Bitácora</button>
-<button onclick="verTab('readyTab')" class="btn-success">READY TO IMPORT</button>
-<button onclick="verTab('eliminadosTab')" class="btn-danger">Eliminados</button>
+            <div class="card" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn-primary" onclick="guardar()">💾 Guardar</button>
+                <button class="btn-success" onclick="exportar()">📊 Exportar CSV</button>
+                <button class="btn-warning" onclick="imprimirPendientes()">🖨️ Imprimir</button>
+                <button class="btn-danger btn-small" onclick="limpiarForm()">Limpiar</button>
+            </div>
 
-<!-- BITACORA -->
-<div id="principal">
+            <div class="card">
+                <div class="grid">
+                    <input type="date" id="filtroFecha" onchange="filtrar()">
+                    <input type="text" id="filtroEjecutivo" placeholder="Filtrar por Ejecutivo" onkeyup="filtrar()">
+                </div>
+            </div>
 
-<div class="card grid">
-<input id="ejecutivo" placeholder="Ejecutivo">
-<input id="referencia" placeholder="Referencia">
-<input id="guia" placeholder="Guía">
-<input id="transportista" placeholder="Transportista">
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th><th>Ejecutivo</th><th>Referencia</th><th>Guía</th>
+                            <th>Transportista</th><th>Planta</th><th>Incidencia</th>
+                            <th>Comentarios</th><th>Tiempo</th><th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla"></tbody>
+                </table>
+            </div>
+            <div id="emptyMain" class="empty-state hidden">📭 No hay registros</div>
+        </div>
 
-<select id="planta">
-<option value="">Planta</option>
-<option>XICO</option><option>SITSA</option><option>P3</option><option>P4</option>
-<option>P1</option><option>SRD</option><option>DRG</option><option>QRO</option>
-<option>QRT2</option><option>CPA</option><option>MTY</option><option>XTS</option>
-<option>CHO</option><option>CMX</option><option>SCL</option>
-</select>
+        <!-- READY -->
+        <div id="ready" class="hidden">
+            <div class="card">
+                <div class="grid">
+                    <input type="date" id="filtroFechaReady" onchange="filtrarReady()">
+                    <input type="text" id="filtroEjecutivoReady" placeholder="Ejecutivo" onkeyup="filtrarReady()">
+                    <select id="filtroPlantaReady" onchange="filtrarReady()">
+                        <option value="">Todas las plantas</option>
+                        <option>XICO</option><option>SITSA</option><option>P3</option><option>P4</option>
+                        <option>P1</option><option>SRD</option><option>DRG</option><option>QRO</option>
+                        <option>QRT2</option><option>CPA</option><option>MTY</option><option>XTS</option>
+                        <option>CHO</option><option>CMX</option><option>SCL</option>
+                    </select>
+                </div>
+            </div>
 
-<select id="tipo">
-<option value="">Incidencia</option>
-<option>Por llegar</option>
-<option>Entregado</option>
-<option>Cambio de planta</option>
-<option>Separación</option>
-<option>Sin entrada</option>
-<option>Sin revisión ni previo</option>
-</select>
-</div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th><th>Ejecutivo</th><th>Referencia</th><th>Guía</th>
+                            <th>Transportista</th><th>Planta</th><th>Incidencia</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaReady"></tbody>
+                </table>
+            </div>
+            <div id="emptyReady" class="empty-state hidden">📦 No hay registros</div>
+        </div>
 
-<textarea id="comentario" placeholder="Comentarios"></textarea><br>
+        <!-- ELIMINADOS -->
+        <div id="deleted" class="hidden">
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>Fecha</th><th>Referencia</th><th>Eliminado por</th></tr>
+                    </thead>
+                    <tbody id="tablaDeleted"></tbody>
+                </table>
+            </div>
+            <div id="emptyDeleted" class="empty-state hidden">✅ No hay registros</div>
+        </div>
+    </div>
 
-<button class="btn-primary" onclick="guardar()">Guardar</button>
-<button class="btn-success" onclick="exportar()">Exportar</button>
-<button class="btn-warning" onclick="imprimirPendientes()">Imprimir PENDIENTES</button>
+    <script>
+        // Firebase Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDfcmbFatO3LnY-ttZ5re_NxAuGsN54wjs",
+            authDomain: "bitacora-almacen-a4b21.firebaseapp.com",
+            projectId: "bitacora-almacen-a4b21",
+            storageBucket: "bitacora-almacen-a4b21.firebasestorage.app",
+            messagingSenderId: "850034877503",
+            appId: "1:850034877503:web:5f7a5cc54c39159ae6848a",
+            databaseURL: "https://bitacora-almacen-a4b21-default-rtdb.firebaseio.com"
+        };
 
-<div class="card grid">
-<input type="date" id="filtroFecha" onchange="filtrar()">
-<input type="text" id="filtroEjecutivo" placeholder="Ejecutivo" onkeyup="filtrar()">
-</div>
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-<table>
-<thead>
-<tr>
-<th>Fecha</th><th>Ejecutivo</th><th>Referencia</th><th>Guía</th>
-<th>Transportista</th><th>Planta</th><th>Incidencia</th>
-<th>Comentarios</th><th>Tiempo</th><th>Acciones</th>
-</tr>
-</thead>
-<tbody id="tabla"></tbody>
-</table>
+        let datos = [];
+        let readyData = [];
+        let eliminados = [];
+        const PASSWORD = "admin123";
 
-</div>
+        // Setup listeners
+        function setupListeners() {
+            db.ref('bitacora').on('value', (snapshot) => {
+                datos = snapshot.val() || [];
+                mostrar();
+                updateStatus(true);
+            }, (error) => {
+                console.error('Error:', error);
+                updateStatus(false);
+            });
 
-<!-- READY -->
-<div id="readyTab" class="hidden">
+            db.ref('ready').on('value', (snapshot) => {
+                readyData = snapshot.val() || [];
+                mostrarReady();
+                updateStatus(true);
+            });
 
-<div class="card grid">
-<input type="date" id="filtroFechaReady" onchange="filtrarReady()">
-<input type="text" id="filtroEjecutivoReady" placeholder="Ejecutivo" onkeyup="filtrarReady()">
-<select id="filtroPlantaReady" onchange="filtrarReady()">
-<option value="">Planta</option>
-<option>XICO</option><option>SITSA</option><option>P3</option><option>P4</option>
-<option>P1</option><option>SRD</option><option>DRG</option><option>QRO</option>
-<option>QRT2</option><option>CPA</option><option>MTY</option><option>XTS</option>
-<option>CHO</option><option>CMX</option><option>SCL</option>
-</select>
-</div>
+            db.ref('eliminados').on('value', (snapshot) => {
+                eliminados = snapshot.val() || [];
+                mostrarDeleted();
+                updateStatus(true);
+            });
+        }
 
-<table>
-<thead>
-<tr>
-<th>Fecha</th><th>Ejecutivo</th><th>Referencia</th><th>Guía</th>
-<th>Transportista</th><th>Planta</th><th>Incidencia</th>
-</tr>
-</thead>
-<tbody id="tablaReady"></tbody>
-</table>
+        function updateStatus(connected) {
+            const status = document.getElementById('status');
+            if (connected) {
+                status.classList.remove('offline');
+                status.innerHTML = '<span class="status-dot"></span>Conectado en Tiempo Real';
+            } else {
+                status.classList.add('offline');
+                status.innerHTML = '⚠️ Sin conexión';
+            }
+        }
 
-</div>
+        function guardar() {
+            const ejecutivo = document.getElementById('ejecutivo').value.trim();
+            const referencia = document.getElementById('referencia').value.trim();
+            const guia = document.getElementById('guia').value.trim();
+            const transportista = document.getElementById('transportista').value.trim();
+            const planta = document.getElementById('planta').value;
+            const tipo = document.getElementById('tipo').value;
+            const comentario = document.getElementById('comentario').value.trim();
 
-<!-- ELIMINADOS -->
-<div id="eliminadosTab" class="hidden">
-<table>
-<thead>
-<tr><th>Fecha</th><th>Referencia</th><th>Eliminado por</th></tr>
-</thead>
-<tbody id="tablaEliminados"></tbody>
-</table>
-</div>
+            if (!ejecutivo || !planta || !tipo || !guia) {
+                alert('Por favor completa los campos requeridos');
+                return;
+            }
 
-</div>
+            const registro = {
+                fecha: new Date().toLocaleString('es-ES'),
+                fechaISO: new Date().toISOString().split('T')[0],
+                ejecutivo,
+                referencia,
+                guia,
+                transportista,
+                planta,
+                tipo,
+                comentario
+            };
 
-<script>
-let datos=JSON.parse(localStorage.getItem("bitacora"))||[];
-let readyData=JSON.parse(localStorage.getItem("ready"))||[];
-let eliminados=JSON.parse(localStorage.getItem("eliminados"))||[];
-let editIndex=null;
-const PASSWORD="admin123";
+            db.ref('bitacora').push(registro).then(() => {
+                limpiarForm();
+                alert('✅ Guardado en tiempo real');
+            }).catch(e => alert('Error: ' + e.message));
+        }
 
-function guardar(){
-let f=new Date();
-let nuevaRef=referencia.value.trim();
-let nuevaGuia=guia.value.trim();
+        function mostrar(lista = datos) {
+            const tabla = document.getElementById('tabla');
+            tabla.innerHTML = '';
 
-let duplicado=datos.some((d,index)=>{
-if(index===editIndex)return false;
-return((nuevaRef && d.referencia===nuevaRef)||(nuevaGuia && d.guia===nuevaGuia));
-});
+            if (lista.length === 0) {
+                document.getElementById('emptyMain').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('emptyMain').classList.add('hidden');
 
-if(duplicado){alert("❌ Ya existe una guía o referencia");return;}
+            lista.forEach((d, i) => {
+                const ahora = new Date();
+                const reg = new Date(d.fechaISO);
+                const horas = Math.floor((ahora - reg) / (1000 * 60 * 60));
+                const dias = Math.floor(horas / 24);
+                const tiempo = dias > 0 ? `${dias}d` : `${horas}h`;
 
-let reg={
-fecha:f.toLocaleString(),
-fechaISO:f.toISOString().split("T")[0],
-ejecutivo:ejecutivo.value,
-referencia:nuevaRef,
-guia:nuevaGuia,
-transportista:transportista.value,
-planta:planta.value,
-tipo:tipo.value,
-comentario:comentario.value,
-alertado:false
-};
+                let clase = 'status-verde';
+                if (!d.referencia) clase = 'status-rojo';
+                else if (dias >= 1) clase = 'status-rojo';
+                else if (horas >= 4) clase = 'status-amarillo';
 
-if(!reg.ejecutivo||!reg.planta||!reg.tipo){alert("Faltan datos");return;}
+                tabla.innerHTML += `
+                    <tr class="${clase}">
+                        <td>${d.fecha}</td>
+                        <td>${d.ejecutivo}</td>
+                        <td>${d.referencia || 'SIN REF'}</td>
+                        <td>${d.guia}</td>
+                        <td>${d.transportista}</td>
+                        <td>${d.planta}</td>
+                        <td>${d.tipo}</td>
+                        <td>${d.comentario}</td>
+                        <td><strong>${tiempo}</strong></td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-small btn-success" onclick="liberar('${d.guia}')">✅</button>
+                                <button class="btn-small btn-danger" onclick="eliminarReg('${d.guia}')">🗑️</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
 
-if(editIndex!==null){datos[editIndex]=reg;editIndex=null;}
-else{datos.push(reg);}
+        function mostrarReady(lista = readyData) {
+            const tabla = document.getElementById('tablaReady');
+            tabla.innerHTML = '';
 
-localStorage.setItem("bitacora",JSON.stringify(datos));
-mostrar();
-}
+            if (lista.length === 0) {
+                document.getElementById('emptyReady').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('emptyReady').classList.add('hidden');
 
-function mostrar(lista=datos){
-tabla.innerHTML="";
-let ahora=new Date();
+            lista.forEach(d => {
+                tabla.innerHTML += `
+                    <tr class="status-verde">
+                        <td>${d.fecha}</td>
+                        <td>${d.ejecutivo}</td>
+                        <td>${d.referencia}</td>
+                        <td>${d.guia}</td>
+                        <td>${d.transportista}</td>
+                        <td>${d.planta}</td>
+                        <td>${d.tipo}</td>
+                    </tr>
+                `;
+            });
+        }
 
-lista.forEach((d,i)=>{
+        function mostrarDeleted(lista = eliminados) {
+            const tabla = document.getElementById('tablaDeleted');
+            tabla.innerHTML = '';
 
-let fechaRegistro=new Date(d.fechaISO);
-let horas=Math.floor((ahora-fechaRegistro)/(1000*60*60));
-let dias=Math.floor(horas/24);
-let tiempoTexto=dias>0?dias+" días":horas+" hrs";
+            if (lista.length === 0) {
+                document.getElementById('emptyDeleted').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('emptyDeleted').classList.add('hidden');
 
-let clase="verde";
-if(!d.referencia){clase="rojo alerta";}
-else if(dias>=1){clase="rojo";}
-else if(horas>=4){clase="amarillo";}
+            Object.entries(lista).forEach(([key, d]) => {
+                tabla.innerHTML += `
+                    <tr>
+                        <td>${d.fecha}</td>
+                        <td>${d.referencia}</td>
+                        <td>${d.eliminadoPor}</td>
+                    </tr>
+                `;
+            });
+        }
 
-// ALERTA
-if(!d.alertado && horas>=4){
-alert("⚠️ Pendiente: "+(d.guia||"SIN GUIA"));
-d.alertado=true;
-localStorage.setItem("bitacora",JSON.stringify(datos));
-}
+        function liberar(guia) {
+            const reg = datos.find(d => d.guia === guia);
+            if (reg) {
+                db.ref('ready').push(reg);
+                db.ref('bitacora').once('value', snap => {
+                    let data = snap.val();
+                    Object.entries(data).forEach(([key, val]) => {
+                        if (val.guia === guia) {
+                            db.ref('bitacora/' + key).remove();
+                        }
+                    });
+                });
+            }
+        }
 
-tabla.innerHTML+=`
-<tr class="${clase}">
-<td>${d.fecha}</td>
-<td>${d.ejecutivo}</td>
-<td>${d.referencia||"SIN REFERENCIA"}</td>
-<td>${d.guia}</td>
-<td>${d.transportista}</td>
-<td>${d.planta}</td>
-<td>${d.tipo}</td>
-<td>${d.comentario||""}</td>
-<td>${tiempoTexto}</td>
-<td>
-<button onclick="editar(${i})">Editar</button>
-<button onclick="liberar(${i})">Liberar</button>
-<button onclick="eliminar(${i})">Eliminar</button>
-</td>
-</tr>`;
-});
-}
+        function eliminarReg(guia) {
+            const pass = prompt('🔒 Contraseña:');
+            if (pass !== PASSWORD) return alert('Incorrecta');
+            const user = prompt('¿Quién elimina?');
+            if (!user) return;
 
-function liberar(i){
-let r=datos[i];
-if(!r.referencia){alert("No tiene referencia");return;}
-readyData.push(r);
-datos.splice(i,1);
-localStorage.setItem("bitacora",JSON.stringify(datos));
-localStorage.setItem("ready",JSON.stringify(readyData));
-mostrar();
-mostrarReady();
-}
+            const reg = datos.find(d => d.guia === guia);
+            db.ref('eliminados').push({
+                fecha: new Date().toLocaleString(),
+                referencia: reg.referencia,
+                eliminadoPor: user
+            });
 
-function mostrarReady(lista=readyData){
-tablaReady.innerHTML="";
-lista.forEach(d=>{
-tablaReady.innerHTML+=`
-<tr>
-<td>${d.fecha}</td>
-<td>${d.ejecutivo}</td>
-<td>${d.referencia}</td>
-<td>${d.guia}</td>
-<td>${d.transportista}</td>
-<td>${d.planta}</td>
-<td>${d.tipo}</td>
-</tr>`;
-});
-}
+            db.ref('bitacora').once('value', snap => {
+                let data = snap.val();
+                Object.entries(data).forEach(([key, val]) => {
+                    if (val.guia === guia) {
+                        db.ref('bitacora/' + key).remove();
+                    }
+                });
+            });
+        }
 
-function filtrar(){
-let f=filtroFecha.value;
-let e=filtroEjecutivo.value.toLowerCase();
-let filtrados=datos.filter(d=>(f?d.fechaISO===f:true)&&(e?d.ejecutivo.toLowerCase().includes(e):true));
-mostrar(filtrados);
-}
+        function filtrar() {
+            const fecha = document.getElementById('filtroFecha').value;
+            const ejecutivo = document.getElementById('filtroEjecutivo').value.toLowerCase();
 
-function filtrarReady(){
-let f=filtroFechaReady.value;
-let e=filtroEjecutivoReady.value.toLowerCase();
-let p=filtroPlantaReady.value;
-let filtrados=readyData.filter(d=>(f?d.fechaISO===f:true)&&(e?d.ejecutivo.toLowerCase().includes(e):true)&&(p?d.planta===p:true));
-mostrarReady(filtrados);
-}
+            const filtrados = datos.filter(d =>
+                (!fecha || d.fechaISO === fecha) &&
+                (!ejecutivo || d.ejecutivo.toLowerCase().includes(ejecutivo))
+            );
+            mostrar(filtrados);
+        }
 
-function editar(i){
-let d=datos[i];
-ejecutivo.value=d.ejecutivo;
-referencia.value=d.referencia;
-guia.value=d.guia;
-transportista.value=d.transportista;
-planta.value=d.planta;
-tipo.value=d.tipo;
-comentario.value=d.comentario;
-editIndex=i;
-}
+        function filtrarReady() {
+            const fecha = document.getElementById('filtroFechaReady').value;
+            const ejecutivo = document.getElementById('filtroEjecutivoReady').value.toLowerCase();
+            const planta = document.getElementById('filtroPlantaReady').value;
 
-function eliminar(i){
-let pass=prompt("Contraseña:");
-if(pass!==PASSWORD)return alert("Incorrecta");
-let user=prompt("¿Quién elimina?");
-eliminados.push({fecha:new Date().toLocaleString(),referencia:datos[i].referencia,eliminadoPor:user});
-datos.splice(i,1);
-localStorage.setItem("bitacora",JSON.stringify(datos));
-localStorage.setItem("eliminados",JSON.stringify(eliminados));
-mostrar();
-mostrarEliminados();
-}
+            const filtrados = readyData.filter(d =>
+                (!fecha || d.fechaISO === fecha) &&
+                (!ejecutivo || d.ejecutivo.toLowerCase().includes(ejecutivo)) &&
+                (!planta || d.planta === planta)
+            );
+            mostrarReady(filtrados);
+        }
 
-function mostrarEliminados(){
-tablaEliminados.innerHTML="";
-eliminados.forEach(d=>{
-tablaEliminados.innerHTML+=`<tr><td>${d.fecha}</td><td>${d.referencia}</td><td>${d.eliminadoPor}</td></tr>`;
-});
-}
+        function exportar() {
+            let csv = 'Fecha,Ejecutivo,Referencia,Guía,Planta\n';
+            datos.forEach(d => {
+                csv += `"${d.fecha}","${d.ejecutivo}","${d.referencia}","${d.guia}","${d.planta}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `bitacora_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+        }
 
-function exportar(){
-let csv="Fecha,Ejecutivo,Referencia\n";
-datos.forEach(d=>{csv+=`${d.fecha},${d.ejecutivo},${d.referencia}\n`;});
-let blob=new Blob([csv]);
-let link=document.createElement("a");
-link.href=URL.createObjectURL(blob);
-link.download="bitacora.csv";
-link.click();
-}
+        function imprimirPendientes() {
+            const pendientes = datos.filter(d => !d.referencia || d.tipo === 'Por llegar');
+            if (pendientes.length === 0) {
+                alert('No hay pendientes');
+                return;
+            }
+            const html = `
+                <h2>PENDIENTES</h2>
+                <table border="1">
+                    <tr><th>Fecha</th><th>Ejecutivo</th><th>Guía</th><th>Planta</th></tr>
+                    ${pendientes.map(d => `<tr><td>${d.fecha}</td><td>${d.ejecutivo}</td><td>${d.guia}</td><td>${d.planta}</td></tr>`).join('')}
+                </table>
+            `;
+            const w = window.open('', '', 'width=900,height=600');
+            w.document.write(html);
+            w.document.close();
+            w.print();
+        }
 
-function imprimirPendientes(){
-let w=window.open("","");
-let html="<h2>PENDIENTES</h2><table border='1'><tr><th>Fecha</th><th>Ejecutivo</th><th>Guía</th><th>Planta</th></tr>";
-datos.forEach(d=>{
-html+=`<tr><td>${d.fecha}</td><td>${d.ejecutivo}</td><td>${d.guia}</td><td>${d.planta}</td></tr>`;
-});
-html+="</table><script>window.print()<\/script>";
-w.document.write(html);
-w.document.close();
-}
+        function limpiarForm() {
+            document.getElementById('ejecutivo').value = '';
+            document.getElementById('referencia').value = '';
+            document.getElementById('guia').value = '';
+            document.getElementById('transportista').value = '';
+            document.getElementById('planta').value = '';
+            document.getElementById('tipo').value = '';
+            document.getElementById('comentario').value = '';
+        }
 
-function verTab(t){
-principal.classList.add("hidden");
-readyTab.classList.add("hidden");
-eliminadosTab.classList.add("hidden");
-document.getElementById(t).classList.remove("hidden");
-}
+        function showTab(tab) {
+            document.getElementById('principal').classList.add('hidden');
+            document.getElementById('ready').classList.add('hidden');
+            document.getElementById('deleted').classList.add('hidden');
+            document.getElementById(tab).classList.remove('hidden');
+        }
 
-mostrar();
-mostrarReady();
-mostrarEliminados();
-</script>
-
+        // Initialize
+        setupListeners();
+    </script>
 </body>
 </html>
